@@ -1,4 +1,4 @@
-const downscale = 15
+const downscale = 10
 
 let width = Math.floor(window.innerWidth / downscale)
 let height = Math.floor(window.innerHeight / downscale)
@@ -207,7 +207,7 @@ function trackMouseSpeedAndDirection(onMove) {
     });
 }
 trackMouseSpeedAndDirection(({ horVel, vertVel, currentX, currentY }) => {
-    injectCircle(currentX, currentY, 1, .5, horVel / 7.5, vertVel / 7.5);
+    injectCircle(currentX, currentY, 3, 1, horVel / 7.5, vertVel / 7.5);
 });
 
     
@@ -223,13 +223,15 @@ function render() {
             const idx = index(x, y)
             const i = ((y - 1) * width + (x - 1)) * 4
 
-            const d = dens[idx]
-            const v = Math.max(0, Math.min(255, d * 255))
+            const r = Math.min(255, dens[idx] * 255)
+            const g = Math.min(255, 255 - Math.abs(u[idx] * 25500))
+            const b = Math.min(255, 255 - Math.abs(v[idx] * 25500))
+            const a = Math.min(255, dens[idx] * 255)
 
-            data[i] = 100      // R
-            data[i + 1] = 100  // G
-            data[i + 2] = 100  // B
-            data[i + 3] = v // A
+            data[i] = r      // R
+            data[i + 1] = g  // G
+            data[i + 2] = b  // B
+            data[i + 3] = a // A
         }
     }
 
