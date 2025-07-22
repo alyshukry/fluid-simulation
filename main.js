@@ -158,44 +158,53 @@ function setWall(w, h, b, x) {
 }
 
 function injectCircle(cx, cy, radius, amount, horVel, vertVel) {
-    const r2 = radius * radius
+    const r2 = radius * radius;
     for (let i = cx - radius; i <= cx + radius; i++) {
         for (let j = cy - radius; j <= cy + radius; j++) {
-            const dx = i - cx
-            const dy = j - cy
-            if (dx*dx + dy*dy <= r2) {
+            const dx = i - cx;
+            const dy = j - cy;
+            if (dx * dx + dy * dy <= r2) {
                 if (i >= 1 && i <= width && j >= 1 && j <= height) { // stay inside grid
-                    densPrev[index(i, j)] += amount
-                    u[index(i, j)] += horVel
-                    v[index(i, j)] += vertVel
+                    densPrev[index(i, j)] += amount;
+                    u[index(i, j)] += horVel;
+                    v[index(i, j)] += vertVel;
                 }
             }
         }
     }
 }
 
-function trackMouseSpeedAndDirection(onMove) {
+function trackPointerSpeedAndDirection(onMove) {
     let lastX = null;
     let lastY = null;
     let lastTime = null;
 
     const rect = canvas.getBoundingClientRect();
 
-    window.addEventListener('mousemove', (e) => {
+    function handleEvent(e) {
         const currentTime = performance.now();
+        let clientX, clientY;
 
-        // Convert mouse coordinates to your scaled grid coordinates
-        const currentX = Math.floor((e.clientX - rect.left + 1) / downscale);
-        const currentY = Math.floor((e.clientY - rect.top + 1) / downscale);
+        if (e.touches) {
+            const touch = e.touches[0];
+            clientX = touch.clientX;
+            clientY = touch.clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+
+        const currentX = Math.floor((clientX - rect.left + 1) / downscale);
+        const currentY = Math.floor((clientY - rect.top + 1) / downscale);
 
         if (lastX !== null && lastY !== null && lastTime !== null) {
             const deltaX = currentX - lastX;
             const deltaY = currentY - lastY;
             const deltaTime = currentTime - lastTime;
 
-            if (deltaTime > 0) { // ignore very fast repeated events
-                const horVel = deltaX / deltaTime; // horizontal speed (cells/ms)
-                const vertVel = deltaY / deltaTime; // vertical speed (cells/ms)
+            if (deltaTime > 0) {
+                const horVel = deltaX / deltaTime;
+                const vertVel = deltaY / deltaTime;
 
                 onMove({ horVel, vertVel, currentX, currentY });
             }
@@ -204,11 +213,20 @@ function trackMouseSpeedAndDirection(onMove) {
         lastX = currentX;
         lastY = currentY;
         lastTime = currentTime;
-    });
+    }
+
+    if ('ontouchstart' in window) {
+        canvas.addEventListener('touchstart', handleEvent);
+        canvas.addEventListener('touchmove', handleEvent);
+    } else {
+        window.addEventListener('mousemove', handleEvent);
+    }
 }
-trackMouseSpeedAndDirection(({ horVel, vertVel, currentX, currentY }) => {
+
+trackPointerSpeedAndDirection(({ horVel, vertVel, currentX, currentY }) => {
     injectCircle(currentX, currentY, 3, 1, horVel / 7.5, vertVel / 7.5);
 });
+
 
     
 function render() {
@@ -228,9 +246,9 @@ function render() {
             const b = Math.min(255, 255 - Math.abs(v[idx] * 25500))
             const a = Math.min(255, dens[idx] * 255)
 
-            data[i] = r      // R
-            data[i + 1] = g  // G
-            data[i + 2] = b  // B
+            data[i] = r     // R
+            data[i + 1] = g // G
+            data[i + 2] = b // B
             data[i + 3] = a // A
         }
     }
