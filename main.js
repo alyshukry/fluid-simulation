@@ -174,59 +174,41 @@ function injectCircle(cx, cy, radius, amount, horVel, vertVel) {
     }
 }
 
-function trackPointerSpeedAndDirection(onMove) {
-    let lastX = null;
-    let lastY = null;
-    let lastTime = null;
+let lastTouchX = null;
+let lastTouchY = null;
+let lastTouchTime = null;
 
+document.addEventListener('touchmove', (e) => {
+    const touch = e.touches[0];
+    const currentTime = performance.now();
+    const currentX = touch.clientX;
+    const currentY = touch.clientY;
+
+    let horVel = 0;
+    let vertVel = 0;
+
+    if (lastTouchX !== null && lastTouchY !== null && lastTouchTime !== null) {
+        const deltaX = currentX - lastTouchX;
+        const deltaY = currentY - lastTouchY;
+        const deltaTime = currentTime - lastTouchTime;
+
+        if (deltaTime > 0) {
+            horVel = deltaX / deltaTime; // px/ms
+            vertVel = deltaY / deltaTime; // px/ms
+        }
+    }
+
+    lastTouchX = currentX;
+    lastTouchY = currentY;
+    lastTouchTime = currentTime;
+
+    // Convert to your grid space if needed
     const rect = canvas.getBoundingClientRect();
+    const gridX = Math.floor((currentX - rect.left + 1) / downscale);
+    const gridY = Math.floor((currentY - rect.top + 1) / downscale);
 
-    function handleEvent(e) {
-        const currentTime = performance.now();
-        let clientX, clientY;
-
-        if (e.touches) {
-            const touch = e.touches[0];
-            clientX = touch.clientX;
-            clientY = touch.clientY;
-        } else {
-            clientX = e.clientX;
-            clientY = e.clientY;
-        }
-
-        const currentX = Math.floor((clientX - rect.left + 1) / downscale);
-        const currentY = Math.floor((clientY - rect.top + 1) / downscale);
-
-        if (lastX !== null && lastY !== null && lastTime !== null) {
-            const deltaX = currentX - lastX;
-            const deltaY = currentY - lastY;
-            const deltaTime = currentTime - lastTime;
-
-            if (deltaTime > 0) {
-                const horVel = deltaX / deltaTime;
-                const vertVel = deltaY / deltaTime;
-
-                onMove({ horVel, vertVel, currentX, currentY });
-            }
-        }
-
-        lastX = currentX;
-        lastY = currentY;
-        lastTime = currentTime;
-    }
-
-    if ('ontouchstart' in window) {
-        canvas.addEventListener('touchstart', handleEvent);
-        canvas.addEventListener('touchmove', handleEvent);
-    } else {
-        window.addEventListener('mousemove', handleEvent);
-    }
-}
-
-trackPointerSpeedAndDirection(({ horVel, vertVel, currentX, currentY }) => {
-    injectCircle(currentX, currentY, 3, 1, horVel / 7.5, vertVel / 7.5);
-});
-
+    injectCircle(gridX, gridY, 2, 1, horVel * 0.5, vertVel * 0.5);
+}, { passive: true });
 
     
 function render() {
