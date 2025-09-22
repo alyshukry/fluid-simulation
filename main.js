@@ -32,15 +32,15 @@ function addSource(arrSize, x, s, dt) {
 
 function diffuse(w, h, b, x, x0, diff, dt) {
     const a = dt * diff * w * w
-    
+
     for (let k = 0; k < 10; k++) {
         for (let i = 1; i <= w; i++) {
             for (let j = 1; j <= h; j++) {
                 x[index(i, j)] = (x0[index(i, j)] + a * (
-                    x[index(i-1, j)] +
-                    x[index(i+1, j)] +
-                    x[index(i, j-1)] +
-                    x[index(i, j+1)]
+                    x[index(i - 1, j)] +
+                    x[index(i + 1, j)] +
+                    x[index(i, j - 1)] +
+                    x[index(i, j + 1)]
                 )) / (1 + 4 * a)
             }
         }
@@ -51,12 +51,12 @@ function diffuse(w, h, b, x, x0, diff, dt) {
 function advect(w, h, b, d, d0, u, v, dt) {
     const dt0x = dt * w
     const dt0y = dt * h
-    
+
     for (let i = 1; i <= w; i++) {
         for (let j = 1; j <= h; j++) {
             let x = i - dt0x * u[index(i, j)]
             let y = j - dt0y * v[index(i, j)]
-            
+
             if (x < .5) x = .5
             if (x > w + .5) x = w + .5
             let i0 = parseInt(x)
@@ -65,14 +65,14 @@ function advect(w, h, b, d, d0, u, v, dt) {
             if (y > h + .5) y = h + .5
             let j0 = parseInt(y)
             let j1 = j0 + 1
-            
+
             const s1 = x - i0
             const s0 = 1 - s1
             const t1 = y - j0
             const t0 = 1 - t1
-            
+
             d[index(i, j)] = s0 * (t0 * d0[index(i0, j0)] + t1 * d0[index(i0, j1)])
-            + s1 * (t0 * d0[index(i1, j0)] + t1 * d0[index(i1, j1)])  
+                + s1 * (t0 * d0[index(i1, j0)] + t1 * d0[index(i1, j1)])
         }
     }
     setWall(w, h, b, d)
@@ -101,7 +101,7 @@ function velStep(w, h, u, v, u0, v0, visc, dt) {
     project(w, h, u, v, u0, v0)
     swap = u0; u0 = u; u = swap
     swap = v0; v0 = v; v = swap
-    
+
     advect(w, h, 1, u, u0, u0, v0, dt)
     advect(w, h, 2, v, v0, u0, v0, dt)
     project(w, h, u, v, u0, v0)
@@ -111,26 +111,26 @@ function project(w, h, u, v, p, div) {
     const spacing = 1 / w
     for (let i = 1; i <= w; i++) {
         for (let j = 1; j <= h; j++) {
-            div[index(i, j)] = -0.5 * spacing * (u[index(i+1, j)] - u[index(i-1, j)] +
-                                           v[index(i, j+1)] - v[index(i, j-1)])
+            div[index(i, j)] = -0.5 * spacing * (u[index(i + 1, j)] - u[index(i - 1, j)] +
+                v[index(i, j + 1)] - v[index(i, j - 1)])
             p[index(i, j)] = 0
         }
     }
     setWall(w, h, 0, div)
     setWall(w, h, 0, p)
-    for (let k=0; k < 10; k++) {
+    for (let k = 0; k < 10; k++) {
         for (let i = 1; i <= w; i++) {
-            for (let j = 1 ; j <= h; j++ ) {
-                p[index(i, j)] = (div[index(i, j)] + p[index(i-1, j)] + p[index(i+1, j)] +
-                                                     p[index(i, j-1)] + p[index(i, j+1)]) / 4
+            for (let j = 1; j <= h; j++) {
+                p[index(i, j)] = (div[index(i, j)] + p[index(i - 1, j)] + p[index(i + 1, j)] +
+                    p[index(i, j - 1)] + p[index(i, j + 1)]) / 4
             }
         }
         setWall(w, h, 0, p)
     }
     for (let i = 1; i <= w; i++) {
         for (let j = 1; j <= h; j++) {
-            u[index(i, j)] -= 0.5 * (p[index(i+1, j)] - p[index(i-1, j)]) / spacing
-            v[index(i, j)] -= 0.5 * (p[index(i, j+1)] - p[index(i, j-1)]) / spacing
+            u[index(i, j)] -= 0.5 * (p[index(i + 1, j)] - p[index(i - 1, j)]) / spacing
+            v[index(i, j)] -= 0.5 * (p[index(i, j + 1)] - p[index(i, j - 1)]) / spacing
         }
     }
     setWall(w, h, 1, u)
@@ -140,20 +140,20 @@ function project(w, h, u, v, p, div) {
 function setWall(w, h, b, x) {
     // Left and right walls
     for (let j = 1; j <= h; j++) {
-        x[index(0,     j)] = (b === 1) ? -x[index(1, j)] : x[index(1, j)]
+        x[index(0, j)] = (b === 1) ? -x[index(1, j)] : x[index(1, j)]
         x[index(w + 1, j)] = (b === 1) ? -x[index(w, j)] : x[index(w, j)]
     }
 
     // Top and bottom walls
     for (let i = 1; i <= w; i++) {
-        x[index(i,     0)] = (b === 2) ? -x[index(i, 1)] : x[index(i, 1)]
+        x[index(i, 0)] = (b === 2) ? -x[index(i, 1)] : x[index(i, 1)]
         x[index(i, h + 1)] = (b === 2) ? -x[index(i, h)] : x[index(i, h)]
     }
 
     // Corners
-    x[index(0,         0)] = 0.5 * (x[index(1,     0)] + x[index(0,     1)])
-    x[index(0,     h + 1)] = 0.5 * (x[index(1, h + 1)] + x[index(0,     h)])
-    x[index(w + 1,     0)] = 0.5 * (x[index(w,     0)] + x[index(w + 1, 1)])
+    x[index(0, 0)] = 0.5 * (x[index(1, 0)] + x[index(0, 1)])
+    x[index(0, h + 1)] = 0.5 * (x[index(1, h + 1)] + x[index(0, h)])
+    x[index(w + 1, 0)] = 0.5 * (x[index(w, 0)] + x[index(w + 1, 1)])
     x[index(w + 1, h + 1)] = 0.5 * (x[index(w, h + 1)] + x[index(w + 1, h)])
 }
 
@@ -164,7 +164,7 @@ function injectCircle(cx, cy, radius, amount, horVel, vertVel) {
             const dx = i - cx;
             const dy = j - cy;
             if (dx * dx + dy * dy <= r2) {
-                if (i >= 1 && i <= width && j >= 1 && j <= height) { // stay inside grid
+                if (i >= 1 && i <= width && j >= 1 && j <= height) {
                     densPrev[index(i, j)] += amount;
                     u[index(i, j)] += horVel;
                     v[index(i, j)] += vertVel;
@@ -173,6 +173,41 @@ function injectCircle(cx, cy, radius, amount, horVel, vertVel) {
         }
     }
 }
+
+const rect = canvas.getBoundingClientRect();
+
+let lastMouseX = null;
+let lastMouseY = null;
+let lastMouseTime = null;
+
+window.addEventListener('mousemove', (e) => {
+    const currentTime = performance.now();
+    const currentX = e.clientX;
+    const currentY = e.clientY;
+
+    let horVel = 0;
+    let vertVel = 0;
+
+    if (lastMouseX !== null && lastMouseY !== null && lastMouseTime !== null) {
+        const deltaX = currentX - lastMouseX;
+        const deltaY = currentY - lastMouseY;
+        const deltaTime = currentTime - lastMouseTime;
+
+        if (deltaTime > 0) {
+            horVel = deltaX / deltaTime;
+            vertVel = deltaY / deltaTime;
+        }
+    }
+
+    lastMouseX = currentX;
+    lastMouseY = currentY;
+    lastMouseTime = currentTime;
+
+    const gridX = Math.floor((currentX - rect.left + 1) / downscale);
+    const gridY = Math.floor((currentY - rect.top + 1) / downscale);
+
+    injectCircle(gridX, gridY, 2, 1, horVel * 0.5, vertVel * 0.5);
+});
 
 let lastTouchX = null;
 let lastTouchY = null;
@@ -193,8 +228,8 @@ document.addEventListener('touchmove', (e) => {
         const deltaTime = currentTime - lastTouchTime;
 
         if (deltaTime > 0) {
-            horVel = deltaX / deltaTime; // px/ms
-            vertVel = deltaY / deltaTime; // px/ms
+            horVel = deltaX / deltaTime;
+            vertVel = deltaY / deltaTime;
         }
     }
 
@@ -202,19 +237,41 @@ document.addEventListener('touchmove', (e) => {
     lastTouchY = currentY;
     lastTouchTime = currentTime;
 
-    // Convert to your grid space if needed
-    const rect = canvas.getBoundingClientRect();
     const gridX = Math.floor((currentX - rect.left + 1) / downscale);
     const gridY = Math.floor((currentY - rect.top + 1) / downscale);
 
     injectCircle(gridX, gridY, 2, 1, horVel * 0.5, vertVel * 0.5);
 }, { passive: true });
 
-    
+function hslToRgb(h, s, l) {
+    let r, g, b;
+
+    if (s == 0) {
+        r = g = b = l * 255;
+    } else {
+        const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1 / 6) return p + (q - p) * 6 * t;
+            if (t < 1 / 2) return q;
+            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+            return p;
+        };
+
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1 / 3) * 255;
+        g = hue2rgb(p, q, h) * 255;
+        b = hue2rgb(p, q, h - 1 / 3) * 255;
+    }
+
+    return [r, g, b];
+}
+
 function render() {
     velStep(width, height, u, v, uPrev, vPrev, viscosity, dt)
     densStep(width, height, dens, densPrev, u, v, diffusion, dt)
-    
+
     const imageData = ctx.createImageData(width, height)
     const data = imageData.data
 
@@ -223,15 +280,14 @@ function render() {
             const idx = index(x, y)
             const i = ((y - 1) * width + (x - 1)) * 4
 
-            const r = Math.min(255, dens[idx] * 255)
-            const g = Math.min(255, 255 - Math.abs(u[idx] * 25500))
-            const b = Math.min(255, 255 - Math.abs(v[idx] * 25500))
-            const a = Math.min(255, dens[idx] * 255)
+            const hue = (dens[idx] * 360) % 360
+            const [r, g, b] = hslToRgb(hue / 360, .5, .5)
+
 
             data[i] = r     // R
             data[i + 1] = g // G
             data[i + 2] = b // B
-            data[i + 3] = a // A
+            data[i + 3] = dens[idx] * 120 // A
         }
     }
 
