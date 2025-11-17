@@ -4,12 +4,13 @@
     <meta charset="UTF-8" />
     <title>Aly's Fluid Simulation</title>
     <style>
-        body { height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; background-color: black;}
-        canvas { display: block; width: 100vw; height: 100vh; }
+        body { height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; background-color: white;}
+        canvas { display: block; width: 128px; height: 64px; image-rendering: crisp-edges; image-rendering: pixelated; margin: 4px; }
     </style>
 </head>
 <body>
-    <canvas id="canvas"></canvas>
+    <canvas id="canvas1" width="64px" height="32px"></canvas>
+    <canvas id="canvas2" width="128px" height="64px"></canvas>
     <script type="module" src="main.js"></script>
 </body>
 </html>
