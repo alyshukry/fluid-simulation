@@ -1,6 +1,6 @@
 
 class Fluid {
-    constructor(canvas, diffusion = .00001, viscosity = 0, dt = 1) {
+    constructor(canvas, diffusion = 0, viscosity = 0, dt = 1) {
         this.dt = dt
         this.diffusion = diffusion
         this.viscosity = viscosity
@@ -11,12 +11,14 @@ class Fluid {
         this.CTX = this.CANVAS.getContext("2d")
 
         this.arrSize = (this.WIDTH + 2) * (this.HEIGHT + 2)
-        this.r = new Array(this.arrSize).fill(0)
-        this.r0 = new Array(this.arrSize).fill(0)
-        this.g = new Array(this.arrSize).fill(0)
-        this.g0 = new Array(this.arrSize).fill(0)
-        this.b = new Array(this.arrSize).fill(0)
-        this.b0 = new Array(this.arrSize).fill(0)
+        this.c = new Array(this.arrSize).fill(0)
+        this.c0 = new Array(this.arrSize).fill(0)
+        this.m = new Array(this.arrSize).fill(0)
+        this.m0 = new Array(this.arrSize).fill(0)
+        this.y = new Array(this.arrSize).fill(0)
+        this.y0 = new Array(this.arrSize).fill(0)
+        this.k = new Array(this.arrSize).fill(0)
+        this.k0 = new Array(this.arrSize).fill(0)
         this.u = new Array(this.arrSize).fill(0)
         this.u0 = new Array(this.arrSize).fill(0)
         this.v = new Array(this.arrSize).fill(0)
@@ -26,6 +28,15 @@ class Fluid {
 
         this.render = this.render.bind(this)
         this.render()
+    }
+
+    stop() {
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+        }
+        if (this.timeoutId) {
+            clearTimeout(this.timeoutId);
+        }
     }
 
     addSource(arrSize, x, s, dt) {
@@ -79,15 +90,27 @@ class Fluid {
         this.setWall(w, h, b, d)
     }
 
-    densStep(w, h, x, x0, u, v, diff, dt) {
-        for (let i = 0; i < x.length; i++) {
-            this.addSource(this.arrSize, x[i], x0[i], dt)
-            let swap = x0[i]; x0[i] = x[i]; x[i] = swap
-            this.diffuse(w, h, 0, x[i], x0[i], diff, dt)
-            swap = x0[i]; x0[i] = x[i]; x[i] = swap
-            this.advect(w, h, 0, x[i], x0[i], u, v, dt)
+    densStep(w, h, fields, fields0, u, v, diff, dt) {
+        for (let n = 0; n < fields.length; n++) {
+            const x = fields[n]
+            const x0 = fields0[n]
+
+            this.addSource(this.arrSize, x, x0, dt)
+
+            // diffuse
+            let tmp = x0.slice()
+            fields0[n] = x
+            fields[n] = tmp
+            this.diffuse(w, h, 0, fields[n], fields0[n], diff, dt)
+
+            // advect
+            tmp = fields0[n]
+            fields0[n] = fields[n]
+            fields[n] = tmp
+            this.advect(w, h, 0, fields[n], fields0[n], u, v, dt)
         }
     }
+
 
     velStep(w, h, u, v, u0, v0, visc, dt) {
         this.addSource(this.arrSize, u, u0, dt)
@@ -153,7 +176,7 @@ class Fluid {
         x[this.index(w + 1, h + 1)] = 0.5 * (x[this.index(w, h + 1)] + x[this.index(w + 1, h)])
     }
 
-    spawnInk(px, py, diameter = Math.ceil((this.WIDTH * this.HEIGHT) / 1500), r = 255, g = 255, b = 255) {
+    spawnInk(px, py, diameter = Math.ceil((this.WIDTH * this.HEIGHT) / 1500), C = 0, M = 0, Y = 0, K = 0) {
         const cx = Math.floor(px)
         const cy = Math.floor(py)
         const rad = diameter * 0.5
@@ -169,9 +192,10 @@ class Fluid {
                 const dy = y - cy
                 if (dx * dx + dy * dy <= rad * rad) {
                     const i = this.index(x, y)
-                    this.r0[i] = r
-                    this.g0[i] = g
-                    this.b0[i] = b
+                    this.c0[i] = C
+                    this.m0[i] = M
+                    this.y0[i] = Y
+                    this.k0[i] = K
                 }
             }
         }
@@ -202,48 +226,77 @@ class Fluid {
 
     render() {
         this.velStep(this.WIDTH, this.HEIGHT, this.u, this.v, this.u0, this.v0, this.viscosity, this.dt)
-        this.densStep(this.WIDTH, this.HEIGHT, [this.r, this.g, this.b], [this.r0, this.g0, this.b0], this.u, this.v, this.diffusion, this.dt)
+        this.densStep(this.WIDTH, this.HEIGHT, [this.c, this.m, this.y, this.k], [this.c0, this.m0, this.y0, this.k0], this.u, this.v, this.diffusion, this.dt)
+
+        function cmykToRgb(C, M, Y, K) {
+            const r = 255 * (1 - C) * (1 - K)
+            const g = 255 * (1 - M) * (1 - K)
+            const b = 255 * (1 - Y) * (1 - K)
+            return { r, g, b }
+        }
+
 
         const imageData = this.CTX.createImageData(this.WIDTH, this.HEIGHT)
 
         for (let x = 1; x <= this.WIDTH; x++) {
             for (let y = 1; y <= this.HEIGHT; y++) {
                 const i = ((y - 1) * this.WIDTH + (x - 1)) * 4
-                imageData.data[i] = this.r[this.index(x, y)]
-                imageData.data[i + 1] = this.g[this.index(x, y)]
-                imageData.data[i + 2] = this.b[this.index(x, y)]
-                imageData.data[i + 3] = 255
+                const C = this.c[this.index(x, y)] / 255
+                const M = this.m[this.index(x, y)] / 255
+                const Y = this.y[this.index(x, y)] / 255
+                const K = this.k[this.index(x, y)] / 255
+
+                const { r, g, b } = cmykToRgb(C, M, Y, K)
+
+                imageData.data[i] = r
+                imageData.data[i + 1] = g
+                imageData.data[i + 2] = b
+                imageData.data[i + 3] = (C + M + Y + K) * 255
+
             }
         }
 
         this.CTX.putImageData(imageData, 0, 0)
 
-        for (let i = 0; i < this.r.length; i++) {
-            this.r[i] -= .005
-            this.g[i] -= .005
-            this.b[i] -= .005
+        for (let i = 0; i < this.c.length; i++) {
+            this.c[i] -= .05
+            this.m[i] -= .05
+            this.y[i] -= .05
+            this.k[i] -= .05
+            this.c[i] = Math.max(0, this.c[i])
+            this.m[i] = Math.max(0, this.m[i])
+            this.y[i] = Math.max(0, this.y[i])
+            this.k[i] = Math.max(0, this.k[i])
         }
 
-        this.r0.fill(0)
-        this.g0.fill(0)
-        this.b0.fill(0)
+        this.c0.fill(0)
+        this.m0.fill(0)
+        this.y0.fill(0)
+        this.k0.fill(0)
+
         this.u0.fill(0)
         this.v0.fill(0)
 
-        setTimeout(() => {
-            injectTwoSides(fluid2)
-            requestAnimationFrame(this.render)
+        this.timeoutId = setTimeout(() => {
+            this.animationId = requestAnimationFrame(this.render)
         }, 0)
     }
 }
 
-const fluid1 = new Fluid(document.getElementById("canvas1"))
-const fluid2 = new Fluid(document.getElementById("canvas2"))
-
 // Example palette (can be any length)
 const palette = [
-    [191, 236, 255],
-    [255, 204, 234],
+    // Cyan ink
+    [255, 0, 0, 0],
+
+    // Magenta ink
+    [0, 255, 0, 0],
+
+    // Yellow ink
+    [0, 0, 255, 0],
+
+    // Black ink
+    [0, 0, 0, 255]
+
 ]
 
 // t loops through palette smoothly
@@ -259,7 +312,6 @@ function getPaletteColor(t) {
     const b = Math.round(p[idx][2] + (p[next][2] - p[idx][2]) * f)
     return { r, g, b }
 }
-
 
 function enableInteraction(fluid) {
     let prevX = null
@@ -306,21 +358,4 @@ function enableInteraction(fluid) {
     window.addEventListener("touchend", end)
 }
 
-
-
-
-enableInteraction(fluid1)
-enableInteraction(fluid2)
-
-function injectTwoSides(fluid, strength = .15) {
-    const mid = Math.floor(fluid.WIDTH / 2)
-
-    fluid.spawnInk(1, Math.floor(fluid.HEIGHT / 2), 2, 0, 0, 255)
-    fluid.injectVelocity(1, Math.floor(fluid.HEIGHT / 2), strength, 0, 2)
-
-    fluid.spawnInk(fluid.WIDTH, Math.floor(fluid.HEIGHT / 2), 2, 255, 0, 0)
-    fluid.injectVelocity(fluid.WIDTH, Math.floor(fluid.HEIGHT / 2), -strength, 0, 2)
-
-}
-
-
+export { Fluid, palette, enableInteraction };

@@ -1,16 +1,329 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
-    <title>Aly's Fluid Simulation</title>
-    <style>
-        body { height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; background-color: white;}
-        canvas { display: block; width: 128px; height: 64px; image-rendering: crisp-edges; image-rendering: pixelated; margin: 4px; }
-    </style>
+    <title>Fluid Simulation Sandbox</title>
 </head>
+
 <body>
-    <canvas id="canvas1" width="64px" height="32px"></canvas>
-    <canvas id="canvas2" width="128px" height="64px"></canvas>
-    <script type="module" src="main.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+        }
+    </style>
+
+    <h1>Fluid Simulation Sandbox</h1>
+
+    <canvas id="fluid" width="64" height="32"
+        style="border: 1px solid black; width:640px; height:320px; image-rendering: pixelated;"></canvas>
+
+    <h2>Controls</h2>
+
+    <div>
+        <label>Diffusion: <input type="range" id="diffusion" min="0" max="0.001" step="0.00001" value="0.00001"></label>
+        <span id="diffusion-val">0</span>
+    </div>
+
+    <div>
+        <label>Viscosity: <input type="range" id="viscosity" min="0" max="0.01" step="0.0001" value="0"></label>
+        <span id="viscosity-val">0</span>
+    </div>
+
+    <div>
+        <label>Time Step: <input type="range" id="dt" min="0.1" max="2" step="0.1" value="1"></label>
+        <span id="dt-val">1</span>
+    </div>
+
+    <div>
+        <label>Color Cycle Speed: <input type="range" id="speed" min="0.001" max="0.02" step="0.001" value="0.005"></label>
+        <span id="speed-val">0.005</span>
+    </div>
+
+    <h2>Canvas Resolution</h2>
+    <div>
+        <label>Width: <input type="number" id="width" min="16" max="256" value="64" style="width: 80px"></label>
+        <label>Height: <input type="number" id="height" min="16" max="128" value="32" style="width: 80px"></label>
+        <label>Cell Size: <input type="number" id="cell-size" min="1" max="15" value="10" style="width: 80px"></label>
+        <button id="apply-resolution">Apply Resolution</button>
+    </div>
+
+    <h2>Ink & Velocity</h2>
+    <div>
+        <label>Ink Size: <input type="range" id="ink-size" min="1" max="20" step="0.5" value="2"></label>
+        <span id="ink-size-val">2</span>
+    </div>
+    <div>
+        <label>Velocity Multiplier: <input type="range" id="velocity-mult" min="0.1" max="5" step="0.1"
+                value="1"></label>
+        <span id="velocity-mult-val">1</span>
+    </div>
+
+    <button id="reset">Reset Fluid</button>
+
+    <h2>Palette Editor</h2>
+    <p>Current Palette:</p>
+    <div id="palette-list"></div>
+    <button id="add-color">Add Color</button>
+
+    <h3>Presets</h3>
+    <button id="preset-cmyk">CMYK</button>
+    <button id="preset-rainbow">Rainbow</button>
+    <button id="preset-fire">Fire</button>
+    <button id="preset-ocean">Ocean</button>
+    <button id="preset-monochrome">Monochrome</button>
+
+    <script type="module">
+        import { Fluid, palette, enableInteraction } from './main.js';
+
+        const canvas = document.getElementById('fluid');
+        let fluid = new Fluid(canvas, 0.00001, 0, 1);
+
+        // Make palette accessible
+        let currentSpeed = 0.005;
+        let inkSize = 2;
+        let velocityMult = 1;
+
+        // Update controls display
+        const diffusionSlider = document.getElementById('diffusion');
+        const viscositySlider = document.getElementById('viscosity');
+        const dtSlider = document.getElementById('dt');
+        const speedSlider = document.getElementById('speed');
+
+        diffusionSlider.addEventListener('input', e => {
+            fluid.diffusion = parseFloat(e.target.value);
+            document.getElementById('diffusion-val').textContent = e.target.value;
+        });
+
+        viscositySlider.addEventListener('input', e => {
+            fluid.viscosity = parseFloat(e.target.value);
+            document.getElementById('viscosity-val').textContent = e.target.value;
+        });
+
+        dtSlider.addEventListener('input', e => {
+            fluid.dt = parseFloat(e.target.value);
+            document.getElementById('dt-val').textContent = e.target.value;
+        });
+
+        speedSlider.addEventListener('input', e => {
+            currentSpeed = parseFloat(e.target.value);
+            document.getElementById('speed-val').textContent = e.target.value;
+        });
+
+        // Ink and velocity controls
+        const inkSizeSlider = document.getElementById('ink-size');
+        const velocityMultSlider = document.getElementById('velocity-mult');
+
+        inkSizeSlider.addEventListener('input', e => {
+            inkSize = parseFloat(e.target.value);
+            document.getElementById('ink-size-val').textContent = e.target.value;
+        });
+
+        velocityMultSlider.addEventListener('input', e => {
+            velocityMult = parseFloat(e.target.value);
+            document.getElementById('velocity-mult-val').textContent = e.target.value;
+        });
+
+        // Resolution controls
+        document.getElementById('apply-resolution').addEventListener('click', () => {
+            const newWidth = parseInt(document.getElementById('width').value);
+            const newHeight = parseInt(document.getElementById('height').value);
+            const newCellSize = parseInt(document.getElementById('cell-size').value);
+
+            // Stop the old fluid's render loop
+            if (fluid.animationId) {
+                cancelAnimationFrame(fluid.animationId);
+            }
+            if (fluid.timeoutId) {
+                clearTimeout(fluid.timeoutId);
+            }
+
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            canvas.style.width = `${newWidth * newCellSize}px`;
+            canvas.style.height = `${newHeight * newCellSize}px`;
+
+            // Recreate fluid with new dimensions
+            const currentDiffusion = fluid.diffusion;
+            const currentViscosity = fluid.viscosity;
+            const currentDt = fluid.dt;
+
+            fluid = new Fluid(canvas, currentDiffusion, currentViscosity, currentDt);
+            setupInteraction();
+        });
+
+        // Reset button
+        document.getElementById('reset').addEventListener('click', () => {
+            fluid.c.fill(0);
+            fluid.c0.fill(0);
+            fluid.m.fill(0);
+            fluid.m0.fill(0);
+            fluid.y.fill(0);
+            fluid.y0.fill(0);
+            fluid.k.fill(0);
+            fluid.k0.fill(0);
+            fluid.u.fill(0);
+            fluid.u0.fill(0);
+            fluid.v.fill(0);
+            fluid.v0.fill(0);
+        });
+
+        // Palette management
+        function renderPalette() {
+            const list = document.getElementById('palette-list');
+            list.innerHTML = '';
+            palette.forEach((color, i) => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    Color ${i + 1}: 
+                    C:<input type="number" min="0" max="255" value="${color[0]}" data-idx="${i}" data-channel="0" style="width: 60px">
+                    M:<input type="number" min="0" max="255" value="${color[1]}" data-idx="${i}" data-channel="1" style="width: 60px">
+                    Y:<input type="number" min="0" max="255" value="${color[2]}" data-idx="${i}" data-channel="2" style="width: 60px">
+                    K:<input type="number" min="0" max="255" value="${color[3]}" data-idx="${i}" data-channel="3" style="width: 60px">
+                    <button data-remove="${i}">Remove</button>
+                `;
+                list.appendChild(div);
+            });
+
+            // Add event listeners
+            list.querySelectorAll('input[type="number"]').forEach(input => {
+                input.addEventListener('change', e => {
+                    const idx = parseInt(e.target.dataset.idx);
+                    const channel = parseInt(e.target.dataset.channel);
+                    palette[idx][channel] = parseInt(e.target.value);
+                });
+            });
+
+            list.querySelectorAll('button[data-remove]').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    const idx = parseInt(e.target.dataset.remove);
+                    palette.splice(idx, 1);
+                    renderPalette();
+                });
+            });
+        }
+
+        document.getElementById('add-color').addEventListener('click', () => {
+            palette.push([0, 0, 0, 0]);
+            renderPalette();
+        });
+
+        // Presets
+        document.getElementById('preset-cmyk').addEventListener('click', () => {
+            palette.length = 0;
+            palette.push([255, 0, 0, 0], [0, 255, 0, 0], [0, 0, 255, 0], [0, 0, 0, 255]);
+            renderPalette();
+        });
+
+        document.getElementById('preset-rainbow').addEventListener('click', () => {
+            palette.length = 0;
+            palette.push(
+                [255, 0, 0, 0],    // Cyan
+                [0, 255, 255, 0],  // Blue
+                [0, 255, 0, 0],    // Magenta
+                [0, 0, 255, 0],    // Yellow
+                [255, 0, 255, 0]   // Green
+            );
+            renderPalette();
+        });
+
+        document.getElementById('preset-fire').addEventListener('click', () => {
+            palette.length = 0;
+            palette.push(
+                [0, 0, 255, 0],    // Yellow
+                [0, 100, 255, 0],  // Orange
+                [0, 255, 255, 0],  // Red
+                [0, 0, 0, 255]     // Black
+            );
+            renderPalette();
+        });
+
+        document.getElementById('preset-ocean').addEventListener('click', () => {
+            palette.length = 0;
+            palette.push(
+                [255, 0, 0, 0],    // Cyan
+                [255, 100, 0, 0],  // Light Blue
+                [150, 0, 0, 0],    // Lighter Cyan
+                [100, 50, 0, 100]  // Deep Blue
+            );
+            renderPalette();
+        });
+
+        document.getElementById('preset-monochrome').addEventListener('click', () => {
+            palette.length = 0;
+            palette.push(
+                [0, 0, 0, 50],
+                [0, 0, 0, 150],
+                [0, 0, 0, 255]
+            );
+            renderPalette();
+        });
+
+        renderPalette();
+
+        // Modified enableInteraction to use currentSpeed, inkSize, and velocityMult
+        function setupInteraction() {
+            let prevX = null;
+            let prevY = null;
+            let t = 0;
+
+            const getPos = e => {
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+                return {
+                    x: x * (fluid.WIDTH / canvas.clientWidth),
+                    y: y * (fluid.HEIGHT / canvas.clientHeight)
+                };
+            };
+
+            function getPaletteColor(t) {
+                const p = palette;
+                const N = p.length;
+                const idx = Math.floor(t) % N;
+                const next = (idx + 1) % N;
+                const f = t - Math.floor(t);
+
+                const r = Math.round(p[idx][0] + (p[next][0] - p[idx][0]) * f);
+                const g = Math.round(p[idx][1] + (p[next][1] - p[idx][1]) * f);
+                const b = Math.round(p[idx][2] + (p[next][2] - p[idx][2]) * f);
+                const k = Math.round(p[idx][3] + (p[next][3] - p[idx][3]) * f);
+                return { r, g, b, k };
+            }
+
+            const move = e => {
+                const { x, y } = getPos(e);
+
+                if (prevX !== null) {
+                    const vx = (x - prevX) * 2 / 50 * velocityMult;
+                    const vy = (y - prevY) * 2 / 50 * velocityMult;
+                    fluid.injectVelocity(x, y, vx, vy, inkSize);
+                }
+
+                t += currentSpeed;
+                const { r, g, b, k } = getPaletteColor(t);
+                fluid.spawnInk(x, y, inkSize, r, g, b, k);
+
+                prevX = x;
+                prevY = y;
+            };
+
+            const end = () => {
+                prevX = prevY = null;
+            };
+
+            // Remove old listeners if they exist
+            canvas.removeEventListener("mousemove", move);
+            canvas.removeEventListener("touchmove", move);
+
+            canvas.addEventListener("mousemove", move);
+            canvas.addEventListener("touchmove", move, { passive: false });
+            window.addEventListener("mouseleave", end);
+            window.addEventListener("touchend", end);
+        }
+
+        setupInteraction();
+    </script>
 </body>
+
 </html>
